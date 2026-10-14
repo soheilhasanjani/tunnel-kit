@@ -1,0 +1,16 @@
+[Unit]
+Description=tunnel-kit dashboard API
+After=network.target xray.service
+Wants=xray.service
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/tunnel-kit.env
+WorkingDirectory=/opt/tunnel-kit/api
+ExecStart=/usr/bin/env node /opt/tunnel-kit/api/server.js
+Restart=on-failure
+RestartSec=3
+User=root
+
+[Install]
+WantedBy=multi-user.target
