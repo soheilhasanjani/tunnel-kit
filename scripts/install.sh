@@ -203,8 +203,18 @@ if id caddy >/dev/null 2>&1; then
 fi
 
 echo "Writing Xray and Caddy configs..."
+mkdir -p /usr/local/etc/xray /var/log/xray
 python3 "$OPT_ROOT/scripts/render.py" "$OPT_ROOT/server/xray.json.tpl" /usr/local/etc/xray/config.json
 python3 "$OPT_ROOT/scripts/render.py" "$OPT_ROOT/server/Caddyfile.tpl" /etc/caddy/Caddyfile
+chmod 644 /usr/local/etc/xray/config.json /etc/caddy/Caddyfile
+chmod 755 /usr/local/etc/xray /var/log/xray
+if id nobody >/dev/null 2>&1; then
+  if getent group nogroup >/dev/null 2>&1; then
+    chown nobody:nogroup /var/log/xray
+  else
+    chown nobody:nobody /var/log/xray
+  fi
+fi
 /usr/local/bin/xray run -test -c /usr/local/etc/xray/config.json
 install -m 644 "$OPT_ROOT/server/sysctl-bbr.conf" /etc/sysctl.d/99-tunnel-kit-bbr.conf
 sysctl -p /etc/sysctl.d/99-tunnel-kit-bbr.conf >/dev/null || true

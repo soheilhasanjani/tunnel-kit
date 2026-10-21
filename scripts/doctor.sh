@@ -42,6 +42,43 @@ check_svc caddy
 check_svc tunnel-kit-api
 echo
 
+XRAY_CFG=/usr/local/etc/xray/config.json
+if [[ -f $XRAY_CFG ]]; then
+  perms=$(stat -c '%a %U:%G' "$XRAY_CFG" 2>/dev/null || stat -f '%OLp %Su:%Sg' "$XRAY_CFG")
+  echo "Xray config: ${XRAY_CFG} (${perms})"
+  mode=${perms%% *}
+  if [[ $mode != 644 && $mode != 664 && $mode != 755 ]]; then
+    echo "FAIL Xray config mode is ${mode}; the xray user (nobody) must be able to read it."
+    echo "     fix: chmod 644 ${XRAY_CFG} && systemctl restart xray"
+    fail=1
+  fi
+else
+  echo "FAIL missing ${XRAY_CFG}"
+  fail=1
+fi
+if [[ -x /usr/local/bin/xray && -f $XRAY_CFG ]]; then
+  echo "Xray config test (as nobody):"
+  if id nobody >/dev/null 2>&1 && command -v runuser >/dev/null 2>&1; then
+    if runuser -u nobody -- /usr/local/bin/xray run -test -c "$XRAY_CFG"; then
+      echo "OK   xray -test as nobody"
+    else
+      echo "FAIL xray -test as nobody (exit $?). This is why port 443 is down."
+      fail=1
+    fi
+  elif /usr/local/bin/xray run -test -c "$XRAY_CFG"; then
+    echo "OK   xray -test as root"
+  else
+    echo "FAIL xray -test failed"
+    fail=1
+  fi
+fi
+if ! systemctl is-active --quiet xray; then
+  echo "--- journalctl -u xray ---"
+  journalctl -u xray -n 25 --no-pager || true
+  echo "--------------------------"
+fi
+echo
+
 listening() {
   local spec=$1
   if ! command -v ss >/dev/null 2>&1; then

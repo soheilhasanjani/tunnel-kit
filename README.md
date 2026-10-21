@@ -215,9 +215,10 @@ Mux / multiplexing: leave **off**.
 
 The usual causes:
 
-1. You opened `https://…` before installing an origin certificate (browser or Cloudflare Error 526).
-2. You pasted a `vless://` share link into the browser. That is for the phone app.
-3. You opened the VPS **IP on port 443**. Xray owns 443; the website is on **port 80**.
+1. **Xray is not running** (doctor shows `FAIL service xray` and `not listening :443`). Xray runs as `nobody`. If `config.json` is mode `600`, Xray exits **23** and port 443 stays closed. `scripts/apply.sh` now forces mode `644`.
+2. You opened `https://…` before installing an origin certificate (browser or Cloudflare Error 526).
+3. You pasted a `vless://` share link into the browser. That is for the phone app.
+4. You opened the VPS **IP on port 443**. Xray owns 443; the website is on **port 80**.
 
 On the VPS:
 
