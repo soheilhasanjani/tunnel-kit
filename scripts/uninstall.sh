@@ -11,6 +11,8 @@ systemctl disable --now tunnel-kit-api 2>/dev/null || true
 systemctl disable --now xray 2>/dev/null || true
 systemctl disable --now caddy 2>/dev/null || true
 rm -f /etc/systemd/system/tunnel-kit-api.service
+rm -f /etc/systemd/system/xray.service.d/20-tunnel-kit.conf
+rmdir /etc/systemd/system/xray.service.d 2>/dev/null || true
 systemctl daemon-reload
 
 if [[ ${1:-} == --purge ]]; then

@@ -10,8 +10,11 @@ fi
 OPT_ROOT=/opt/tunnel-kit
 XRAY_CFG=/usr/local/etc/xray/config.json
 CADDY_CFG=/etc/caddy/Caddyfile
+OVERRIDE=/etc/systemd/system/xray.service.d/20-tunnel-kit.conf
 
-mkdir -p /usr/local/etc/xray /var/log/xray
+mkdir -p /usr/local/etc/xray /var/log/xray /etc/systemd/system/xray.service.d
+install -m 644 "$OPT_ROOT/server/xray.override.conf" "$OVERRIDE"
+systemctl daemon-reload
 python3 "$OPT_ROOT/scripts/render.py" "$OPT_ROOT/server/xray.json.tpl" "$XRAY_CFG"
 python3 "$OPT_ROOT/scripts/render.py" "$OPT_ROOT/server/Caddyfile.tpl" "$CADDY_CFG"
 chmod 644 "$XRAY_CFG" "$CADDY_CFG"
@@ -30,12 +33,8 @@ if command -v caddy >/dev/null 2>&1; then
   caddy validate --config "$CADDY_CFG"
 fi
 if [[ -x /usr/local/bin/xray ]]; then
-  echo "Testing Xray config as nobody (the service user)..."
-  if id nobody >/dev/null 2>&1; then
-    runuser -u nobody -- /usr/local/bin/xray run -test -c "$XRAY_CFG"
-  else
-    /usr/local/bin/xray run -test -c "$XRAY_CFG"
-  fi
+  echo "Testing Xray config..."
+  /usr/local/bin/xray run -test -c "$XRAY_CFG"
 fi
 
 systemctl restart caddy xray tunnel-kit-api

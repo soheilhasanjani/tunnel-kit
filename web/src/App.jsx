@@ -153,6 +153,12 @@ function Dashboard() {
       </section>
 
       {error && error !== "auth" ? <p className="error">{error}</p> : null}
+      {status && !status.xray ? (
+        <p className="error">
+          Xray is down, so Reality and the CDN HTTPS path will not work. On the VPS run{" "}
+          <code>sudo bash /opt/tunnel-kit/scripts/fix-xray-now.sh</code> then refresh this page.
+        </p>
+      ) : null}
 
       <p className="lead">
         Scan <strong>Stable / Reality</strong> on your phone first. Keep{" "}

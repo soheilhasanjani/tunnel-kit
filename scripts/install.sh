@@ -217,6 +217,8 @@ if id nobody >/dev/null 2>&1; then
 fi
 find /var/log/xray -type f -exec chmod 644 {} +
 /usr/local/bin/xray run -test -c /usr/local/etc/xray/config.json
+mkdir -p /etc/systemd/system/xray.service.d
+install -m 644 "$OPT_ROOT/server/xray.override.conf" /etc/systemd/system/xray.service.d/20-tunnel-kit.conf
 install -m 644 "$OPT_ROOT/server/sysctl-bbr.conf" /etc/sysctl.d/99-tunnel-kit-bbr.conf
 sysctl -p /etc/sysctl.d/99-tunnel-kit-bbr.conf >/dev/null || true
 install -m 644 "$OPT_ROOT/server/tunnel-kit-api.service" /etc/systemd/system/tunnel-kit-api.service

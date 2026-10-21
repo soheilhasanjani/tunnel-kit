@@ -159,8 +159,9 @@ echo "  Cloudflare SSL/TLS: use Full (strict) only AFTER an Origin Certificate"
 echo "  or run: sudo bash /opt/tunnel-kit/scripts/issue-cert.sh"
 echo
 if [[ $fail -ne 0 ]]; then
-  echo "Doctor found problems. Fix the FAIL lines, then:"
-  echo "  sudo bash /opt/tunnel-kit/scripts/apply.sh"
+  echo "Doctor found problems. To bring Xray up on :443:"
+  echo "  sudo bash /opt/tunnel-kit/scripts/fix-xray-now.sh"
+  echo "then: sudo bash /opt/tunnel-kit/scripts/apply.sh"
   exit 1
 fi
 echo "Doctor: no local FAIL lines. If the public URL still fails, it is DNS or the CDN in front."

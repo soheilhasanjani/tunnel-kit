@@ -243,6 +243,7 @@ The usual causes:
 On the VPS:
 
 ```bash
+sudo bash /opt/tunnel-kit/scripts/fix-xray-now.sh
 sudo bash /opt/tunnel-kit/scripts/doctor.sh
 systemctl status xray caddy tunnel-kit-api
 journalctl -u xray -n 50 --no-pager
