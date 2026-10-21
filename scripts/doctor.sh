@@ -106,12 +106,12 @@ listening() {
 }
 
 listening 80
-listening 443
-listening 8443
+listening 10086
+listening 10087
 listening 8787
 echo
-if systemctl is-active --quiet xray && ! ss -lnt 2>/dev/null | awk '{print $4}' | grep -E ':443$' >/dev/null; then
-  echo "FAIL systemd says xray is active, but nothing is on :443. Dashboard will show Xray down."
+if systemctl is-active --quiet xray && ! ss -lnt 2>/dev/null | awk '{print $4}' | grep -E ':10086$' >/dev/null; then
+  echo "FAIL systemd says xray is active, but nothing is on :10086."
   journalctl -u xray -n 15 --no-pager || true
   fail=1
 fi
@@ -123,10 +123,10 @@ else
   fail=1
 fi
 
-if curl -fskS -m 5 https://127.0.0.1:8443/api/health >/dev/null; then
-  echo "OK   local HTTPS origin on 8443"
+if curl -fskS -m 5 https://127.0.0.1/api/health >/dev/null; then
+  echo "OK   local HTTPS on 443"
 else
-  echo "WARN local HTTPS origin on 8443 did not answer (CDN https:// may fail until the cert is valid)"
+  echo "WARN local HTTPS on 443 did not answer"
 fi
 
 if [[ -s /etc/tunnel-kit/certs/cert.pem && -s /etc/tunnel-kit/certs/key.pem ]]; then
@@ -159,7 +159,7 @@ echo "  Cloudflare SSL/TLS: use Full (strict) only AFTER an Origin Certificate"
 echo "  or run: sudo bash /opt/tunnel-kit/scripts/issue-cert.sh"
 echo
 if [[ $fail -ne 0 ]]; then
-  echo "Doctor found problems. To bring Xray up on :443:"
+  echo "Doctor found problems. To bring Xray up:"
   echo "  sudo bash /opt/tunnel-kit/scripts/fix-xray-now.sh"
   echo "then: sudo bash /opt/tunnel-kit/scripts/apply.sh"
   exit 1

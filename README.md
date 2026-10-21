@@ -2,10 +2,12 @@
 
 Personal V2Ray/Xray on an Ubuntu VPS, with a small web dashboard.
 
-You get **two** ways to connect:
+Xray serves two simple VLESS inbounds (no Reality):
 
-1. **Stable / Reality** — the phone talks straight to your VPS. Use this every day.
-2. **Proxied** — traffic goes through **any** reverse proxy or CDN in front of the VPS (Cloudflare, Fastly, Bunny, nginx, Caddy, HAProxy, …). That hides the server IP. Use it as a backup if Reality is blocked.
+1. **WebSocket** on port **10086**
+2. **XHTTP** on port **10087**
+
+Caddy on 80/443 reverse-proxies those paths and the dashboard. Put any CDN (ArvanCloud, Cloudflare, …) in front of `vpn.example.com`.
 
 The dashboard shows both as QR codes.
 
@@ -15,19 +17,16 @@ You do **not** need to be a sysadmin. Follow the steps in order. If a step fails
 
 This project used to assume **Cloudflare** was the only proxy: orange-cloud DNS, an Origin Certificate, and a dashboard profile literally named “Cloudflare”.
 
-Cloudflare is still a good choice. It is just **one** reverse proxy. The proxied profile is now generic:
+Cloudflare is still a good choice. It is just **one** reverse proxy.
 
-- Clients connect to your **proxy hostname** (example: `vpn.example.com`) with VLESS + XHTTP + TLS.
-- Whatever sits in front — Cloudflare, another CDN, or a second VPS running nginx/Caddy/HAProxy — terminates or forwards that TLS and sends it to this VPS on port **443**.
-- Xray owns 443. Connections that are not Reality fall through to Caddy, which serves the dashboard and the XHTTP path.
-
-Reality (direct) is unchanged. It does **not** go through the CDN.
+- Clients connect to `vpn.example.com` with VLESS (WebSocket or XHTTP) on port 443.
+- Caddy on the VPS terminates HTTP/HTTPS and reverse-proxies those paths to Xray on **10086** / **10087**.
 
 ## What you need
 
 - An **Ubuntu** VPS (22.04 or 24.04) and its **IP address**
 - SSH access (`root` or a user that can `sudo`)
-- A domain, plus **any** reverse proxy / CDN you want in front (or skip the proxy and use Reality only)
+- A domain, plus **any** reverse proxy / CDN you want in front
 
 ## 1. Clone this project on the Ubuntu VPS
 
@@ -65,10 +64,9 @@ bash scripts/install.sh
 
 The installer asks for:
 
-- **Proxy hostname** — `vpn.example.com` (the name clients and the CDN use)
-- **Proxy / CDN name** — `Cloudflare`, `Fastly`, `Bunny`, `nginx`, or any label you like
-- **Reality host** — `direct.example.com` (DNS-only) or the VPS IP
-- **Dashboard password** — invent one and remember it
+- **Proxy hostname** — `vpn.example.com`
+- **Proxy / CDN name** — `ArvanCloud`, `Cloudflare`, …
+- **Dashboard password**
 
 Wait until it prints `=== Done ===`.
 
@@ -78,13 +76,7 @@ You need two names. How you create them depends on the proxy, but the idea is th
 
 | Name | Points at | Proxied? |
 | --- | --- | --- |
-| `vpn.example.com` | VPS IP (or the CDN origin) | **Yes** — through Cloudflare / Fastly / nginx / … |
-| `direct.example.com` | VPS IP | **No** — DNS only, for Reality |
-
-That gives you:
-
-- `vpn.example.com` — dashboard + the proxied XHTTP profile
-- `direct.example.com` — Reality (straight to the VPS)
+| `vpn.example.com` | VPS IP | **Yes** — through ArvanCloud / Cloudflare / … |
 
 ### ArvanCloud (ابر آروان)
 
@@ -93,7 +85,7 @@ This is the usual setup in Iran. Two A records, both to the VPS IP (`64.227.29.1
 | Record | Cloud icon | Why |
 | --- | --- | --- |
 | `vpn` → `vpn.akbarbegins.ir` | **ON** (active cloud) | Dashboard + proxied XHTTP. Visitors hit ArvanCloud, not the raw IP. |
-| `direct` → `direct.akbarbegins.ir` | **OFF** | Reality. Must skip the CDN or Reality breaks. |
+| `direct` (optional) | **OFF** | Not required for this VLESS setup. |
 
 The raw IP (`http://64.227.29.143/`) opening the dashboard is expected: that hits Caddy on **port 80**. The domain `vpn.…` goes through ArvanCloud, which by default talks to origin **port 443**. If Xray is down, 443 is closed, so **the domain fails and the IP still works**.
 
@@ -203,7 +195,7 @@ http://vpn.example.com/
 
 Log in with the dashboard password. You should see Xray **running** and two QR codes.
 
-- Scan **Stable / Reality** first
+- Scan **VLESS / WebSocket** or **VLESS / XHTTP**
 - Keep **Proxied** (labeled with your CDN name) as a backup
 
 `https://vpn.example.com` only works after step 3 (a real origin certificate). A `vless://` link is **not** a website — Chrome will not load it. Paste that into v2rayNG / Hiddify.
@@ -219,7 +211,7 @@ sudo bash /opt/tunnel-kit/scripts/doctor.sh
 
 ## 5. Phone / laptop apps
 
-Install a **recent** client (old apps do not support XHTTP / Reality):
+Install a **recent** client (old apps do not support XHTTP):
 
 - Android: **v2rayNG** or **Hiddify**
 - iOS: **Streisand** or **Hiddify**
@@ -233,7 +225,7 @@ Mux / multiplexing: leave **off**.
 
 The usual causes:
 
-1. **Xray is not running** (dashboard shows Xray **down**, `ss` has no `0.0.0.0:443`). `grep 443` also matches Caddy’s **8443** — that is not Xray. Xray runs as `nobody`. Exit **23** is usually:
+1. **Xray is not running** (dashboard shows Xray **down**, `ss` has no `:10086` / `:10087`). Caddy owns **80/443**. Xray exit **23** is usually:
    - `config.json` mode `600` (cannot read), or
    - `/var/log/xray/access.log` owned by **root** (cannot write). `chown` on the directory does not change that file. `scripts/apply.sh` now `chown -R` the log dir and sends Xray logs to the systemd journal instead.
 2. You opened `https://…` before installing an origin certificate (browser or Cloudflare Error 526).

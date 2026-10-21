@@ -138,11 +138,11 @@ h2 {
   gap: 16px;
 }
 
-.card.reality {
+.card.ws {
   border-color: color-mix(in srgb, var(--reality) 45%, var(--line));
 }
 
-.card.proxy {
+.card.xhttp {
   border-color: color-mix(in srgb, var(--proxy) 40%, var(--line));
 }
 

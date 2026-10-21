@@ -131,36 +131,27 @@ function proxyLabel() {
   return env("PROXY_NAME") || "CDN";
 }
 
-function shareFragment(name) {
-  return encodeURIComponent(String(name || "Proxied").replace(/\s+/g, "-"));
-}
-
 function shareLinks() {
   const uuid = env("UUID");
   const domain = env("DOMAIN");
-  const direct = env("DIRECT_HOST") || env("PUBLIC_IP") || domain;
-  const path = env("XHTTP_PATH");
-  const pbk = env("REALITY_PUBLIC_KEY");
-  const sid = env("REALITY_SHORT_ID");
-  const sni = env("REALITY_SNI") || domain;
+  const wsPath = env("WS_PATH");
+  const xhttpPath = env("XHTTP_PATH");
   const proxyName = proxyLabel();
 
-  const reality =
-    `vless://${uuid}@${direct}:443?` +
+  const ws =
+    `vless://${uuid}@${domain}:443?` +
     encodeQuery({
       encryption: "none",
-      flow: "xtls-rprx-vision",
-      security: "reality",
-      sni,
+      security: "tls",
+      sni: domain,
+      host: domain,
       fp: "chrome",
-      pbk,
-      sid,
-      type: "tcp",
-      headerType: "none",
+      type: "ws",
+      path: wsPath,
     }) +
-    "#Reality-Stable";
+    "#VLESS-WS";
 
-  const proxy =
+  const xhttp =
     `vless://${uuid}@${domain}:443?` +
     encodeQuery({
       encryption: "none",
@@ -170,12 +161,12 @@ function shareLinks() {
       fp: "chrome",
       alpn: "h2",
       type: "xhttp",
-      path,
-      mode: "packet-up",
+      path: xhttpPath,
+      mode: "auto",
     }) +
-    `#${shareFragment(proxyName)}`;
+    "#VLESS-XHTTP";
 
-  return { reality, proxy, proxyName };
+  return { ws, xhttp, proxyName };
 }
 
 async function handler(req, res) {
@@ -224,12 +215,11 @@ async function handler(req, res) {
   if (req.method === "GET" && path === "/api/status") {
     reloadCfg();
     return send(res, 200, {
-      xray: serviceActive("xray") && portListening(443),
-      caddy: serviceActive("caddy") && (portListening(80) || portListening(8443)),
+      xray: serviceActive("xray") && portListening(10086) && portListening(10087),
+      caddy: serviceActive("caddy") && portListening(80),
       api: true,
       domain: env("DOMAIN"),
       proxyName: proxyLabel(),
-      directHost: env("DIRECT_HOST") || env("PUBLIC_IP"),
     });
   }
 
@@ -239,19 +229,18 @@ async function handler(req, res) {
     return send(res, 200, {
       domain: env("DOMAIN"),
       proxyName: links.proxyName,
-      directHost: env("DIRECT_HOST") || env("PUBLIC_IP"),
       profiles: [
         {
-          id: "reality",
-          title: "Stable / Reality",
-          hint: "Use this every day. Direct to your VPS, usually the steadiest.",
-          link: links.reality,
+          id: "ws",
+          title: "VLESS / WebSocket",
+          hint: "Scan in v2rayNG / Hiddify. Path is proxied through your CDN on 443.",
+          link: links.ws,
         },
         {
-          id: "proxy",
-          title: links.proxyName,
-          hint: `Goes through ${links.proxyName} and hides the VPS IP. Backup if Reality is blocked.`,
-          link: links.proxy,
+          id: "xhttp",
+          title: "VLESS / XHTTP",
+          hint: "Same UUID, XHTTP transport. Use if WebSocket is blocked.",
+          link: links.xhttp,
         },
       ],
     });

@@ -1,45 +1,30 @@
 {
   "log": {
-    "loglevel": "warning",
-    "access": "none"
+    "loglevel": "debug",
+    "access": "/var/log/v2ray/access.log",
+    "error": "/var/log/v2ray/error.log"
   },
   "inbounds": [
     {
-      "tag": "reality",
-      "listen": "0.0.0.0",
-      "port": 443,
+      "port": 10086,
       "protocol": "vless",
       "settings": {
         "clients": [
           {
-            "id": "{{UUID}}",
-            "flow": "xtls-rprx-vision"
+            "id": "{{UUID}}"
           }
         ],
         "decryption": "none"
       },
       "streamSettings": {
-        "network": "tcp",
-        "security": "reality",
-        "realitySettings": {
-          "show": false,
-          "dest": "127.0.0.1:{{CADDY_HTTPS_PORT}}",
-          "xver": 0,
-          "serverNames": ["{{REALITY_SNI}}"],
-          "privateKey": "{{REALITY_PRIVATE_KEY}}",
-          "shortIds": ["{{REALITY_SHORT_ID}}"]
+        "network": "ws",
+        "wsSettings": {
+          "path": "{{WS_PATH}}"
         }
-      },
-      "sniffing": {
-        "enabled": true,
-        "destOverride": ["http", "tls", "quic"],
-        "routeOnly": true
       }
     },
     {
-      "tag": "xhttp",
-      "listen": "127.0.0.1",
-      "port": {{XHTTP_PORT}},
+      "port": 10087,
       "protocol": "vless",
       "settings": {
         "clients": [
@@ -51,27 +36,17 @@
       },
       "streamSettings": {
         "network": "xhttp",
-        "security": "none",
         "xhttpSettings": {
           "path": "{{XHTTP_PATH}}",
           "mode": "auto"
         }
-      },
-      "sniffing": {
-        "enabled": true,
-        "destOverride": ["http", "tls", "quic"],
-        "routeOnly": true
       }
     }
   ],
   "outbounds": [
     {
       "protocol": "freedom",
-      "tag": "direct"
-    },
-    {
-      "protocol": "blackhole",
-      "tag": "block"
+      "settings": {}
     }
   ]
 }

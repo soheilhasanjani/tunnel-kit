@@ -49,27 +49,9 @@ public_ip() {
     || hostname -I | awk '{print $1}'
 }
 
-parse_x25519() {
-  # Supports both "PrivateKey/Password" and "Private key/Public key" output.
-  local out private public
-  out=$(/usr/local/bin/xray x25519)
-  private=$(printf '%s\n' "$out" | awk -F': *' '/[Pp]rivate/{print $2; exit}')
-  public=$(printf '%s\n' "$out" | awk -F': *' '/Password:|[Pp]ublic/{print $2; exit}')
-  if [[ -z $private || -z $public ]]; then
-    echo "Could not parse xray x25519 output:" >&2
-    echo "$out" >&2
-    exit 1
-  fi
-  printf '%s %s\n' "$private" "$public"
-}
-
 echo
 echo "=== tunnel-kit installer ==="
-echo "You will need:"
-echo "  1. A hostname for the proxied profile, e.g. vpn.example.com"
-echo "  2. Any reverse proxy / CDN in front of this VPS (Cloudflare, Fastly, nginx, ...)"
-echo "     or skip that and use Reality only"
-echo "  3. Optional DNS-only name for Reality, e.g. direct.yourdomain.com"
+echo "VLESS WebSocket :10086 + XHTTP :10087 behind Caddy."
 echo
 
 DOMAIN=$(ask "Proxy hostname (clients + CDN), e.g. vpn.example.com")
@@ -78,9 +60,7 @@ if [[ -z $DOMAIN ]]; then
   exit 1
 fi
 
-PROXY_NAME=$(ask "Reverse proxy / CDN name (Cloudflare, Fastly, Bunny, nginx, ...)" "CDN")
-DEFAULT_DIRECT=$(public_ip)
-DIRECT_HOST=$(ask "Reality host (DNS-only name or this server IP)" "$DEFAULT_DIRECT")
+PROXY_NAME=$(ask "Reverse proxy / CDN name (Cloudflare, ArvanCloud, nginx, ...)" "CDN")
 DASHBOARD_PASSWORD=$(ask_secret "Dashboard password (you will type this in the browser)")
 if [[ -z $DASHBOARD_PASSWORD ]]; then
   echo "Password is required." >&2
@@ -138,11 +118,9 @@ if path.exists():
         if line.strip() and not line.startswith("#") and "=" in line:
             k, _, v = line.partition("=")
             current[k] = v
-    for key in ("UUID", "XHTTP_PATH", "REALITY_PRIVATE_KEY", "REALITY_PUBLIC_KEY", "REALITY_SHORT_ID", "SESSION_SECRET"):
+    for key in ("UUID", "WS_PATH", "XHTTP_PATH", "SESSION_SECRET"):
         if key in current:
             values[key] = current[key]
-    values.setdefault("XHTTP_PORT", current.get("XHTTP_PORT", "10000"))
-    values.setdefault("CADDY_HTTPS_PORT", current.get("CADDY_HTTPS_PORT", "8443"))
     values.setdefault("PROXY_NAME", current.get("PROXY_NAME", "CDN"))
 else:
     print("Generating secrets...")
@@ -152,9 +130,8 @@ values["API_HOST"] = "127.0.0.1"
 values["API_PORT"] = "8787"
 values["TUNNEL_KIT_ENV"] = str(path)
 order = [
-    "DOMAIN", "PROXY_NAME", "DIRECT_HOST", "PUBLIC_IP", "UUID", "XHTTP_PATH",
-    "XHTTP_PORT", "CADDY_HTTPS_PORT", "REALITY_PRIVATE_KEY", "REALITY_PUBLIC_KEY",
-    "REALITY_SHORT_ID", "REALITY_SNI", "DASHBOARD_PASSWORD", "SESSION_SECRET",
+    "DOMAIN", "PROXY_NAME", "PUBLIC_IP", "UUID", "WS_PATH", "XHTTP_PATH",
+    "DASHBOARD_PASSWORD", "SESSION_SECRET",
     "CERT_FILE", "KEY_FILE", "API_HOST", "API_PORT", "TUNNEL_KIT_ENV",
 ]
 lines = [f"{k}={values[k]}" for k in order if k in values]
@@ -164,8 +141,7 @@ PY
 }
 
 UUID=$(/usr/local/bin/xray uuid)
-read -r REALITY_PRIVATE_KEY REALITY_PUBLIC_KEY <<<"$(parse_x25519)"
-REALITY_SHORT_ID=$(openssl rand -hex 4)
+WS_PATH="/$(openssl rand -hex 12)"
 XHTTP_PATH="/$(openssl rand -hex 12)"
 SESSION_SECRET=$(openssl rand -hex 32)
 PUBLIC_IP=$(public_ip)
@@ -173,16 +149,10 @@ PUBLIC_IP=$(public_ip)
 write_env \
   "DOMAIN=${DOMAIN}" \
   "PROXY_NAME=${PROXY_NAME}" \
-  "DIRECT_HOST=${DIRECT_HOST}" \
   "PUBLIC_IP=${PUBLIC_IP}" \
   "UUID=${UUID}" \
+  "WS_PATH=${WS_PATH}" \
   "XHTTP_PATH=${XHTTP_PATH}" \
-  "XHTTP_PORT=10000" \
-  "CADDY_HTTPS_PORT=8443" \
-  "REALITY_PRIVATE_KEY=${REALITY_PRIVATE_KEY}" \
-  "REALITY_PUBLIC_KEY=${REALITY_PUBLIC_KEY}" \
-  "REALITY_SHORT_ID=${REALITY_SHORT_ID}" \
-  "REALITY_SNI=${DOMAIN}" \
   "DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD}" \
   "SESSION_SECRET=${SESSION_SECRET}"
 
@@ -203,7 +173,7 @@ if id caddy >/dev/null 2>&1; then
 fi
 
 echo "Writing Xray and Caddy configs..."
-mkdir -p /usr/local/etc/xray /var/log/xray
+mkdir -p /usr/local/etc/xray /var/log/xray /var/log/v2ray
 python3 "$OPT_ROOT/scripts/render.py" "$OPT_ROOT/server/xray.json.tpl" /usr/local/etc/xray/config.json
 python3 "$OPT_ROOT/scripts/render.py" "$OPT_ROOT/server/Caddyfile.tpl" /etc/caddy/Caddyfile
 chmod 644 /usr/local/etc/xray/config.json /etc/caddy/Caddyfile
@@ -255,7 +225,6 @@ echo "  sudo bash ${OPT_ROOT}/scripts/doctor.sh"
 echo
 echo "DNS:"
 echo "  ${DOMAIN}        -> this VPS (through ${PROXY_NAME})"
-echo "  ${DIRECT_HOST}   -> this VPS IP, DNS only   [Reality; skip if this is already an IP]"
 echo
 echo "Origin certificate (needed for https:// and most CDNs):"
 echo "  Cloudflare Origin CA, or: sudo bash ${OPT_ROOT}/scripts/issue-cert.sh"
@@ -263,6 +232,6 @@ echo "  save cert  -> ${CERT_DIR}/cert.pem"
 echo "  save key   -> ${CERT_DIR}/key.pem"
 echo "  then: systemctl reload caddy"
 echo
-echo "On your phone: open the dashboard, scan  Stable / Reality  first."
+echo "On your phone: open the dashboard and scan a VLESS QR (WebSocket or XHTTP)."
 echo "Secrets file: ${ENV_FILE}  (do not commit this)"
 echo

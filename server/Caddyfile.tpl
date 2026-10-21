@@ -1,13 +1,16 @@
 {
-	https_port {{CADDY_HTTPS_PORT}}
 	auto_https disable_redirects
 }
 
 (app) {
-	@xhttp path {{XHTTP_PATH}}*
+	@ws path {{WS_PATH}}*
+	handle @ws {
+		reverse_proxy 127.0.0.1:10086
+	}
 
+	@xhttp path {{XHTTP_PATH}}*
 	handle @xhttp {
-		reverse_proxy 127.0.0.1:{{XHTTP_PORT}} {
+		reverse_proxy 127.0.0.1:10087 {
 			flush_interval -1
 			transport http {
 				versions h2c
@@ -27,8 +30,6 @@
 	}
 }
 
-# Public dashboard. Open http://YOUR_VPS_IP/ or http://{{DOMAIN}}/ in a browser.
-# vless:// QR links are for phone apps, not Chrome.
 :80 {
 	handle /.well-known/acme-challenge/* {
 		root * /var/www/acme
@@ -37,9 +38,7 @@
 	import app
 }
 
-# Origin TLS for a CDN / Reality fallback (Xray owns public 443).
-:{{CADDY_HTTPS_PORT}} {
-	bind 127.0.0.1
+:443 {
 	tls {{CERT_FILE}} {{KEY_FILE}}
 	import app
 }

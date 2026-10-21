@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Rendered files must be world-readable even with a strict umask (Xray runs as nobody)."""
+"""Rendered Xray JSON matches simple VLESS WS + XHTTP and is world-readable."""
 
 from __future__ import annotations
 
+import json
 import os
 import pathlib
 import subprocess
@@ -18,17 +19,10 @@ def main() -> None:
         env.write_text(
             "\n".join(
                 [
-                    'DOMAIN=vpn.example.com',
+                    "DOMAIN=vpn.example.com",
+                    "WS_PATH=/wssecret",
                     'XHTTP_PATH=/secret"path',
-                    "XHTTP_PORT=10000",
-                    "CADDY_HTTPS_PORT=8443",
-                    "CERT_FILE=/etc/tunnel-kit/certs/cert.pem",
-                    "KEY_FILE=/etc/tunnel-kit/certs/key.pem",
                     "UUID=00000000-0000-4000-8000-000000000000",
-                    "REALITY_PRIVATE_KEY=priv",
-                    "REALITY_PUBLIC_KEY=pub",
-                    "REALITY_SHORT_ID=abcd",
-                    "REALITY_SNI=vpn.example.com",
                 ]
             )
             + "\n",
@@ -43,12 +37,14 @@ def main() -> None:
         )
         mode = oct(out.stat().st_mode)[-3:]
         assert mode == "644", mode
-        text = out.read_text(encoding="utf-8")
-        assert r"/secret\"path" in text, text
-        import json
-
-        data = json.loads(text)
-        assert data["log"]["access"] == "none", data["log"]
+        data = json.loads(out.read_text(encoding="utf-8"))
+        assert "reality" not in json.dumps(data).lower()
+        ports = [i["port"] for i in data["inbounds"]]
+        assert ports == [10086, 10087], ports
+        assert data["inbounds"][0]["streamSettings"]["network"] == "ws"
+        assert data["inbounds"][0]["streamSettings"]["wsSettings"]["path"] == "/wssecret"
+        assert data["inbounds"][1]["streamSettings"]["network"] == "xhttp"
+        assert data["inbounds"][1]["streamSettings"]["xhttpSettings"]["path"] == '/secret"path'
         print("render-perms.test.py ok")
 
 

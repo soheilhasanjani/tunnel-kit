@@ -41,7 +41,7 @@ function ProfileCard({ profile }) {
   return (
     <article className={`card ${profile.id}`}>
       <header>
-        <p className="kicker">{profile.id === "reality" ? "Use this first" : "Through your reverse proxy"}</p>
+        <p className="kicker">{profile.id === "ws" ? "WebSocket" : "XHTTP"}</p>
         <h2>{profile.title}</h2>
         <p className="hint">{profile.hint}</p>
       </header>
@@ -155,15 +155,13 @@ function Dashboard() {
       {error && error !== "auth" ? <p className="error">{error}</p> : null}
       {status && !status.xray ? (
         <p className="error">
-          Xray is down, so Reality and the CDN HTTPS path will not work. On the VPS run{" "}
+          Xray is down. On the VPS run{" "}
           <code>sudo bash /opt/tunnel-kit/scripts/fix-xray-now.sh</code> then refresh this page.
         </p>
       ) : null}
 
       <p className="lead">
-        Scan <strong>Stable / Reality</strong> on your phone first. Keep{" "}
-        <strong>{share?.proxyName || "your reverse proxy"}</strong> as a backup if Reality is blocked.
-        These QR codes are for v2rayNG / Hiddify — they will not open in a web browser.
+        Scan a QR in v2rayNG / Hiddify. These links will not open in a web browser.
       </p>
 
       <section className="grid">

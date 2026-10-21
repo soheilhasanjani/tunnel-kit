@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-shot: make Xray listen on :443. Safe to re-run.
+# One-shot: start VLESS WS :10086 and XHTTP :10087.
 #   sudo bash /opt/tunnel-kit/scripts/fix-xray-now.sh
 set -euo pipefail
 
@@ -17,39 +17,13 @@ if [[ ! -f $CFG ]]; then
   exit 1
 fi
 
-python3 - "$CFG" <<'PY'
-import json, pathlib, sys
-path = pathlib.Path(sys.argv[1])
-data = json.loads(path.read_text(encoding="utf-8"))
-log = data.get("log") or {}
-log["access"] = "none"
-log.pop("error", None)
-log.setdefault("loglevel", "warning")
-data["log"] = log
-path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-print("set log.access=none in", path)
-PY
 chmod 644 "$CFG"
-
-mkdir -p /etc/systemd/system/xray.service.d
-SRC="$OPT_ROOT/server/xray.override.conf"
-if [[ -f $SRC ]]; then
-  install -m 644 "$SRC" "$OVERRIDE"
-else
-  cat >"$OVERRIDE" <<'UNIT'
-[Service]
-User=root
-Group=root
-Restart=on-failure
-RestartPreventExitStatus=
-UNIT
-  chmod 644 "$OVERRIDE"
+mkdir -p /etc/systemd/system/xray.service.d /var/log/v2ray /var/log/xray
+if [[ -f $OPT_ROOT/server/xray.override.conf ]]; then
+  install -m 644 "$OPT_ROOT/server/xray.override.conf" "$OVERRIDE"
 fi
+chmod 755 /var/log/v2ray /var/log/xray
 systemctl daemon-reload
-
-mkdir -p /var/log/xray
-rm -f /var/log/xray/access.log /var/log/xray/error.log
-chmod 755 /var/log/xray
 
 echo "Testing config..."
 /usr/local/bin/xray run -test -c "$CFG"
@@ -58,11 +32,11 @@ systemctl restart xray
 sleep 1
 echo "xray: $(systemctl is-active xray || true)"
 echo "listeners:"
-ss -lnt | awk 'NR==1 || $4 ~ /:(80|443|8443|8787)$/'
-if ! ss -lnt | awk '{print $4}' | grep -E ':443$' >/dev/null; then
+ss -lnt | awk 'NR==1 || $4 ~ /:(80|443|10086|10087|8787)$/'
+if ! ss -lnt | awk '{print $4}' | grep -E ':10086$' >/dev/null; then
   echo
-  echo "Still no :443. Journal:"
+  echo "Still no :10086. Journal:"
   journalctl -u xray -n 30 --no-pager || true
   exit 1
 fi
-echo "Xray is on 443. Refresh the dashboard — Xray should show running."
+echo "Xray is on 10086/10087. Refresh the dashboard."

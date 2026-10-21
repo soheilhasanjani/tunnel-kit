@@ -19,10 +19,8 @@ fs.writeFileSync(
     "DIRECT_HOST=direct.example.com",
     "PUBLIC_IP=203.0.113.10",
     "UUID=00000000-0000-4000-8000-000000000000",
+    "WS_PATH=/secretws",
     "XHTTP_PATH=/secretpath",
-    "REALITY_PUBLIC_KEY=publickey",
-    "REALITY_SHORT_ID=abcd1234",
-    "REALITY_SNI=vpn.example.com",
     `DASHBOARD_PASSWORD=${PASSWORD}`,
     "SESSION_SECRET=session-secret-for-tests",
   ].join("\n") + "\n"
@@ -98,19 +96,19 @@ async function main() {
   const share = await request("GET", "/api/share", { cookie });
   if (share.status !== 200) throw new Error(`share failed: ${share.status}`);
   const ids = (share.json.profiles || []).map((p) => p.id);
-  if (!ids.includes("reality") || !ids.includes("proxy")) {
-    throw new Error(`expected reality + proxy profiles, got ${ids.join(",")}`);
+  if (!ids.includes("ws") || !ids.includes("xhttp")) {
+    throw new Error(`expected ws + xhttp profiles, got ${ids.join(",")}`);
   }
-  if (ids.includes("cloudflare")) {
-    throw new Error("legacy cloudflare profile id should be gone");
+  if (ids.includes("reality")) {
+    throw new Error("reality profile should be gone");
   }
-  const proxied = share.json.profiles.find((p) => p.id === "proxy");
-  if (proxied.title !== "Fastly") throw new Error(`proxy title: ${proxied.title}`);
-  if (!proxied.link.includes("vpn.example.com") || !proxied.link.includes("type=xhttp")) {
-    throw new Error(`proxy link looks wrong: ${proxied.link}`);
+  const xhttp = share.json.profiles.find((p) => p.id === "xhttp");
+  if (!xhttp.link.includes("vpn.example.com") || !xhttp.link.includes("type=xhttp")) {
+    throw new Error(`xhttp link looks wrong: ${xhttp.link}`);
   }
-  if (proxied.link.includes("Cloudflare")) {
-    throw new Error("share link still hardcodes Cloudflare");
+  const ws = share.json.profiles.find((p) => p.id === "ws");
+  if (!ws.link.includes("type=ws") || !ws.link.includes("secretws")) {
+    throw new Error(`ws link looks wrong: ${ws.link}`);
   }
   if (share.json.proxyName !== "Fastly") throw new Error("share.proxyName");
 
