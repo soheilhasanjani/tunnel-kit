@@ -231,14 +231,20 @@ systemctl restart caddy xray tunnel-kit-api
 
 echo
 echo "=== Done ==="
-echo "Browser dashboard:  https://${DOMAIN}"
+echo "Open the dashboard in a web browser (not a vless:// QR):"
+echo "  http://${PUBLIC_IP}/"
+echo "  http://${DOMAIN}/"
+echo "https://${DOMAIN} only works after a real origin certificate is installed."
 echo "Reverse proxy / CDN: ${PROXY_NAME}"
+echo
+echo "If the page does not load, run:"
+echo "  sudo bash ${OPT_ROOT}/scripts/doctor.sh"
 echo
 echo "DNS:"
 echo "  ${DOMAIN}        -> this VPS (through ${PROXY_NAME})"
 echo "  ${DIRECT_HOST}   -> this VPS IP, DNS only   [Reality; skip if this is already an IP]"
 echo
-echo "Origin certificate (the CDN must trust it):"
+echo "Origin certificate (needed for https:// and most CDNs):"
 echo "  Cloudflare Origin CA, or: sudo bash ${OPT_ROOT}/scripts/issue-cert.sh"
 echo "  save cert  -> ${CERT_DIR}/cert.pem"
 echo "  save key   -> ${CERT_DIR}/key.pem"
