@@ -210,11 +210,12 @@ chmod 644 /usr/local/etc/xray/config.json /etc/caddy/Caddyfile
 chmod 755 /usr/local/etc/xray /var/log/xray
 if id nobody >/dev/null 2>&1; then
   if getent group nogroup >/dev/null 2>&1; then
-    chown nobody:nogroup /var/log/xray
+    chown -R nobody:nogroup /var/log/xray
   else
-    chown nobody:nobody /var/log/xray
+    chown -R nobody:nobody /var/log/xray
   fi
 fi
+find /var/log/xray -type f -exec chmod 644 {} +
 /usr/local/bin/xray run -test -c /usr/local/etc/xray/config.json
 install -m 644 "$OPT_ROOT/server/sysctl-bbr.conf" /etc/sysctl.d/99-tunnel-kit-bbr.conf
 sysctl -p /etc/sysctl.d/99-tunnel-kit-bbr.conf >/dev/null || true

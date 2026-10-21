@@ -47,7 +47,8 @@ def main() -> None:
         assert r"/secret\"path" in text, text
         import json
 
-        json.loads(text)
+        data = json.loads(text)
+        assert data["log"]["access"] == "none", data["log"]
         print("render-perms.test.py ok")
 
 

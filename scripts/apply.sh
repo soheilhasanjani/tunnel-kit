@@ -16,13 +16,15 @@ python3 "$OPT_ROOT/scripts/render.py" "$OPT_ROOT/server/xray.json.tpl" "$XRAY_CF
 python3 "$OPT_ROOT/scripts/render.py" "$OPT_ROOT/server/Caddyfile.tpl" "$CADDY_CFG"
 chmod 644 "$XRAY_CFG" "$CADDY_CFG"
 chmod 755 /usr/local/etc/xray /var/log/xray
+# Existing access.log/error.log are often root:root; chown the dir alone is not enough.
 if id nobody >/dev/null 2>&1; then
   if getent group nogroup >/dev/null 2>&1; then
-    chown nobody:nogroup /var/log/xray
+    chown -R nobody:nogroup /var/log/xray
   else
-    chown nobody:nobody /var/log/xray
+    chown -R nobody:nobody /var/log/xray
   fi
 fi
+find /var/log/xray -type f -exec chmod 644 {} +
 
 if command -v caddy >/dev/null 2>&1; then
   caddy validate --config "$CADDY_CFG"

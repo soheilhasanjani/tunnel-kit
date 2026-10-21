@@ -42,6 +42,17 @@ check_svc caddy
 check_svc tunnel-kit-api
 echo
 
+if [[ -e /var/log/xray/access.log ]]; then
+  logperms=$(stat -c '%a %U:%G' /var/log/xray/access.log 2>/dev/null || true)
+  echo "Xray access.log: ${logperms}"
+  owner=${logperms##* }
+  if [[ $owner == root:root ]]; then
+    echo "FAIL /var/log/xray/access.log is root-owned; Xray (nobody) cannot write it."
+    echo "     fix: sudo chown -R nobody:nogroup /var/log/xray && sudo systemctl restart xray"
+    fail=1
+  fi
+fi
+
 XRAY_CFG=/usr/local/etc/xray/config.json
 if [[ -f $XRAY_CFG ]]; then
   perms=$(stat -c '%a %U:%G' "$XRAY_CFG" 2>/dev/null || stat -f '%OLp %Su:%Sg' "$XRAY_CFG")
