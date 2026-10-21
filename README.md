@@ -176,12 +176,28 @@ Copy any valid cert for `vpn.example.com` (or a covering wildcard) into those tw
 
 ## 4. Open the dashboard
 
-In a browser: `https://vpn.example.com`
+**Use a web browser**, and try HTTP first (this does not need a certificate):
+
+```text
+http://YOUR_VPS_IP/
+http://vpn.example.com/
+```
 
 Log in with the dashboard password. You should see Xray **running** and two QR codes.
 
 - Scan **Stable / Reality** first
 - Keep **Proxied** (labeled with your CDN name) as a backup
+
+`https://vpn.example.com` only works after step 3 (a real origin certificate). A `vless://` link is **not** a website — Chrome will not load it. Paste that into v2rayNG / Hiddify.
+
+If you already installed an older copy, update then check:
+
+```bash
+cd ~/tunnel-kit   # or wherever you cloned it
+git pull
+sudo bash scripts/update.sh
+sudo bash /opt/tunnel-kit/scripts/doctor.sh
+```
 
 ## 5. Phone / laptop apps
 
@@ -195,11 +211,18 @@ Scan the QR (or copy the link). In Hiddify you can import **both** and let it fa
 
 Mux / multiplexing: leave **off**.
 
-## If something is wrong
+## If the address does not load
+
+The usual causes:
+
+1. You opened `https://…` before installing an origin certificate (browser or Cloudflare Error 526).
+2. You pasted a `vless://` share link into the browser. That is for the phone app.
+3. You opened the VPS **IP on port 443**. Xray owns 443; the website is on **port 80**.
 
 On the VPS:
 
 ```bash
+sudo bash /opt/tunnel-kit/scripts/doctor.sh
 systemctl status xray caddy tunnel-kit-api
 journalctl -u xray -n 50 --no-pager
 journalctl -u caddy -n 50 --no-pager

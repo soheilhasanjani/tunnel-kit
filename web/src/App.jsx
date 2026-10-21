@@ -49,7 +49,7 @@ function ProfileCard({ profile }) {
         <QRCodeSVG value={profile.link} size={168} bgColor="#f4f1ea" fgColor="#14120f" level="M" />
       </div>
       <button type="button" className="copy" onClick={copy}>
-        {copied ? "Copied" : "Copy link"}
+        {copied ? "Copied" : "Copy for the app"}
       </button>
     </article>
   );
@@ -157,6 +157,7 @@ function Dashboard() {
       <p className="lead">
         Scan <strong>Stable / Reality</strong> on your phone first. Keep{" "}
         <strong>{share?.proxyName || "your reverse proxy"}</strong> as a backup if Reality is blocked.
+        These QR codes are for v2rayNG / Hiddify — they will not open in a web browser.
       </p>
 
       <section className="grid">
