@@ -7,7 +7,7 @@
   --panel: #1b1a16;
   --accent: #d7f25b;
   --reality: #d7f25b;
-  --cf: #7ec8e3;
+  --proxy: #7ec8e3;
   --danger: #ff7a6e;
   --font: "Segoe UI", ui-sans-serif, system-ui, sans-serif;
 }
@@ -142,8 +142,8 @@ h2 {
   border-color: color-mix(in srgb, var(--reality) 45%, var(--line));
 }
 
-.card.cloudflare {
-  border-color: color-mix(in srgb, var(--cf) 40%, var(--line));
+.card.proxy {
+  border-color: color-mix(in srgb, var(--proxy) 40%, var(--line));
 }
 
 .kicker {

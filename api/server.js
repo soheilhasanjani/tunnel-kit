@@ -113,6 +113,14 @@ function encodeQuery(params) {
     .join("&");
 }
 
+function proxyLabel() {
+  return env("PROXY_NAME") || "CDN";
+}
+
+function shareFragment(name) {
+  return encodeURIComponent(String(name || "Proxied").replace(/\s+/g, "-"));
+}
+
 function shareLinks() {
   const uuid = env("UUID");
   const domain = env("DOMAIN");
@@ -121,6 +129,7 @@ function shareLinks() {
   const pbk = env("REALITY_PUBLIC_KEY");
   const sid = env("REALITY_SHORT_ID");
   const sni = env("REALITY_SNI") || domain;
+  const proxyName = proxyLabel();
 
   const reality =
     `vless://${uuid}@${direct}:443?` +
@@ -137,7 +146,7 @@ function shareLinks() {
     }) +
     "#Reality-Stable";
 
-  const cloudflare =
+  const proxy =
     `vless://${uuid}@${domain}:443?` +
     encodeQuery({
       encryption: "none",
@@ -150,9 +159,9 @@ function shareLinks() {
       path,
       mode: "packet-up",
     }) +
-    "#Cloudflare";
+    `#${shareFragment(proxyName)}`;
 
-  return { reality, cloudflare };
+  return { reality, proxy, proxyName };
 }
 
 async function handler(req, res) {
@@ -205,6 +214,7 @@ async function handler(req, res) {
       caddy: serviceActive("caddy"),
       api: true,
       domain: env("DOMAIN"),
+      proxyName: proxyLabel(),
       directHost: env("DIRECT_HOST") || env("PUBLIC_IP"),
     });
   }
@@ -214,6 +224,7 @@ async function handler(req, res) {
     const links = shareLinks();
     return send(res, 200, {
       domain: env("DOMAIN"),
+      proxyName: links.proxyName,
       directHost: env("DIRECT_HOST") || env("PUBLIC_IP"),
       profiles: [
         {
@@ -223,10 +234,10 @@ async function handler(req, res) {
           link: links.reality,
         },
         {
-          id: "cloudflare",
-          title: "Cloudflare",
-          hint: "Hides your server IP. Use when you care more about hiding than speed.",
-          link: links.cloudflare,
+          id: "proxy",
+          title: links.proxyName,
+          hint: `Goes through ${links.proxyName} and hides the VPS IP. Backup if Reality is blocked.`,
+          link: links.proxy,
         },
       ],
     });

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Install Xray + Caddy + dashboard on Ubuntu. Run as root on the VPS:
-#   sudo bash scripts/install.sh
+# Install Xray + Caddy + dashboard on Ubuntu. Prefer cloning on the VPS:
+#   git clone https://github.com/soheilhasanjani/tunnel-kit.git
+#   cd tunnel-kit && sudo bash scripts/install.sh
 set -euo pipefail
 
 if [[ ${EUID:-$(id -u)} -ne 0 ]]; then
@@ -65,19 +66,21 @@ parse_x25519() {
 echo
 echo "=== tunnel-kit installer ==="
 echo "You will need:"
-echo "  1. A domain already added in Cloudflare"
-echo "  2. An A record pointing to this VPS (orange cloud)"
-echo "  3. Optional grey-cloud A record for Reality, e.g. direct.yourdomain.com"
+echo "  1. A hostname for the proxied profile, e.g. vpn.example.com"
+echo "  2. Any reverse proxy / CDN in front of this VPS (Cloudflare, Fastly, nginx, ...)"
+echo "     or skip that and use Reality only"
+echo "  3. Optional DNS-only name for Reality, e.g. direct.yourdomain.com"
 echo
 
-DOMAIN=$(ask "Cloudflare domain (orange cloud), e.g. vpn.example.com")
+DOMAIN=$(ask "Proxy hostname (clients + CDN), e.g. vpn.example.com")
 if [[ -z $DOMAIN ]]; then
   echo "Domain is required." >&2
   exit 1
 fi
 
+PROXY_NAME=$(ask "Reverse proxy / CDN name (Cloudflare, Fastly, Bunny, nginx, ...)" "CDN")
 DEFAULT_DIRECT=$(public_ip)
-DIRECT_HOST=$(ask "Reality host (grey-cloud name or this server IP)" "$DEFAULT_DIRECT")
+DIRECT_HOST=$(ask "Reality host (DNS-only name or this server IP)" "$DEFAULT_DIRECT")
 DASHBOARD_PASSWORD=$(ask_secret "Dashboard password (you will type this in the browser)")
 if [[ -z $DASHBOARD_PASSWORD ]]; then
   echo "Password is required." >&2
@@ -113,7 +116,7 @@ if ! need_cmd caddy; then
   apt-get install -y caddy
 fi
 
-mkdir -p "$OPT_ROOT" "$CERT_DIR" "$WWW_DIR" /var/log/xray
+mkdir -p "$OPT_ROOT" "$CERT_DIR" "$WWW_DIR" /var/www/acme /var/log/xray
 if [[ $REPO_ROOT != "$OPT_ROOT" ]]; then
   rsync -a \
     --exclude '.git' \
@@ -140,6 +143,7 @@ if path.exists():
             values[key] = current[key]
     values.setdefault("XHTTP_PORT", current.get("XHTTP_PORT", "10000"))
     values.setdefault("CADDY_HTTPS_PORT", current.get("CADDY_HTTPS_PORT", "8443"))
+    values.setdefault("PROXY_NAME", current.get("PROXY_NAME", "CDN"))
 else:
     print("Generating secrets...")
 values["CERT_FILE"] = f"{cert_dir}/cert.pem"
@@ -148,8 +152,8 @@ values["API_HOST"] = "127.0.0.1"
 values["API_PORT"] = "8787"
 values["TUNNEL_KIT_ENV"] = str(path)
 order = [
-    "DOMAIN", "DIRECT_HOST", "PUBLIC_IP", "UUID", "XHTTP_PATH", "XHTTP_PORT",
-    "CADDY_HTTPS_PORT", "REALITY_PRIVATE_KEY", "REALITY_PUBLIC_KEY",
+    "DOMAIN", "PROXY_NAME", "DIRECT_HOST", "PUBLIC_IP", "UUID", "XHTTP_PATH",
+    "XHTTP_PORT", "CADDY_HTTPS_PORT", "REALITY_PRIVATE_KEY", "REALITY_PUBLIC_KEY",
     "REALITY_SHORT_ID", "REALITY_SNI", "DASHBOARD_PASSWORD", "SESSION_SECRET",
     "CERT_FILE", "KEY_FILE", "API_HOST", "API_PORT", "TUNNEL_KIT_ENV",
 ]
@@ -168,6 +172,7 @@ PUBLIC_IP=$(public_ip)
 
 write_env \
   "DOMAIN=${DOMAIN}" \
+  "PROXY_NAME=${PROXY_NAME}" \
   "DIRECT_HOST=${DIRECT_HOST}" \
   "PUBLIC_IP=${PUBLIC_IP}" \
   "UUID=${UUID}" \
@@ -185,8 +190,8 @@ systemctl stop caddy 2>/dev/null || true
 systemctl stop xray 2>/dev/null || true
 
 if [[ ! -s $CERT_DIR/cert.pem || ! -s $CERT_DIR/key.pem ]]; then
-  echo "No Cloudflare origin certificate found. Creating a temporary self-signed cert."
-  echo "Cloudflare SSL mode Full (strict) will FAIL until you replace these files."
+  echo "No origin certificate found. Creating a temporary self-signed cert."
+  echo "Any CDN that verifies the origin certificate will FAIL until you replace these files."
   openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -days 825 -nodes \
     -keyout "$CERT_DIR/key.pem" -out "$CERT_DIR/cert.pem" \
     -subj "/CN=${DOMAIN}" >/dev/null 2>&1
@@ -213,9 +218,10 @@ rm -rf "$WWW_DIR"
 mkdir -p "$WWW_DIR"
 cp -a dist/. "$WWW_DIR/"
 
-echo "Firewall: allow SSH + HTTPS only..."
+echo "Firewall: allow SSH, HTTP (ACME), and HTTPS..."
 ufw allow 22/tcp >/dev/null
 ufw allow OpenSSH >/dev/null || true
+ufw allow 80/tcp >/dev/null
 ufw allow 443/tcp >/dev/null
 ufw --force enable >/dev/null
 
@@ -226,14 +232,14 @@ systemctl restart caddy xray tunnel-kit-api
 echo
 echo "=== Done ==="
 echo "Browser dashboard:  https://${DOMAIN}"
-echo "  (Cloudflare SSL/TLS must be Full (strict) AFTER you install an Origin Certificate)"
+echo "Reverse proxy / CDN: ${PROXY_NAME}"
 echo
-echo "Cloudflare DNS:"
-echo "  A  ${DOMAIN}                 -> this VPS IP   Proxied (orange)"
-echo "  A  ${DIRECT_HOST}            -> this VPS IP   DNS only (grey)   [if it is a hostname]"
+echo "DNS:"
+echo "  ${DOMAIN}        -> this VPS (through ${PROXY_NAME})"
+echo "  ${DIRECT_HOST}   -> this VPS IP, DNS only   [Reality; skip if this is already an IP]"
 echo
-echo "Origin certificate (needed for Full strict):"
-echo "  Cloudflare -> SSL/TLS -> Origin Server -> Create Certificate"
+echo "Origin certificate (the CDN must trust it):"
+echo "  Cloudflare Origin CA, or: sudo bash ${OPT_ROOT}/scripts/issue-cert.sh"
 echo "  save cert  -> ${CERT_DIR}/cert.pem"
 echo "  save key   -> ${CERT_DIR}/key.pem"
 echo "  then: systemctl reload caddy"

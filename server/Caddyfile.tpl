@@ -3,6 +3,14 @@
 	auto_https disable_redirects
 }
 
+:80 {
+	handle /.well-known/acme-challenge/* {
+		root * /var/www/acme
+		file_server
+	}
+	respond "ok" 200
+}
+
 https://{{DOMAIN}}:{{CADDY_HTTPS_PORT}} {
 	bind 127.0.0.1
 	tls {{CERT_FILE}} {{KEY_FILE}}

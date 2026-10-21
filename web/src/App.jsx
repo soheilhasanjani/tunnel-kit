@@ -41,7 +41,7 @@ function ProfileCard({ profile }) {
   return (
     <article className={`card ${profile.id}`}>
       <header>
-        <p className="kicker">{profile.id === "reality" ? "Use this first" : "Backup"}</p>
+        <p className="kicker">{profile.id === "reality" ? "Use this first" : "Through your reverse proxy"}</p>
         <h2>{profile.title}</h2>
         <p className="hint">{profile.hint}</p>
       </header>
@@ -149,13 +149,14 @@ function Dashboard() {
         <StatusDot ok={Boolean(status?.xray)} label="Xray" />
         <StatusDot ok={Boolean(status?.caddy)} label="Caddy" />
         {status?.domain ? <span className="pill muted">{status.domain}</span> : null}
+        {status?.proxyName ? <span className="pill muted">{status.proxyName}</span> : null}
       </section>
 
       {error && error !== "auth" ? <p className="error">{error}</p> : null}
 
       <p className="lead">
-        Scan <strong>Stable / Reality</strong> on your phone first. Keep Cloudflare as a backup if
-        Reality is blocked.
+        Scan <strong>Stable / Reality</strong> on your phone first. Keep{" "}
+        <strong>{share?.proxyName || "your reverse proxy"}</strong> as a backup if Reality is blocked.
       </p>
 
       <section className="grid">
