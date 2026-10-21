@@ -107,6 +107,20 @@ function serviceActive(name) {
   }
 }
 
+function portListening(port) {
+  try {
+    const out = execFileSync("ss", ["-lnt"], { encoding: "utf8" });
+    const want = Number(port);
+    return out.split("\n").some((line) => {
+      const addr = line.trim().split(/\s+/)[3] || "";
+      const m = addr.match(/:(\d+)$/);
+      return Boolean(m) && Number(m[1]) === want;
+    });
+  } catch {
+    return false;
+  }
+}
+
 function encodeQuery(params) {
   return Object.entries(params)
     .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
@@ -210,8 +224,8 @@ async function handler(req, res) {
   if (req.method === "GET" && path === "/api/status") {
     reloadCfg();
     return send(res, 200, {
-      xray: serviceActive("xray"),
-      caddy: serviceActive("caddy"),
+      xray: serviceActive("xray") && portListening(443),
+      caddy: serviceActive("caddy") && (portListening(80) || portListening(8443)),
       api: true,
       domain: env("DOMAIN"),
       proxyName: proxyLabel(),

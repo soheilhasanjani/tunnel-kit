@@ -42,25 +42,79 @@ check_svc caddy
 check_svc tunnel-kit-api
 echo
 
+if [[ -e /var/log/xray/access.log ]]; then
+  logperms=$(stat -c '%a %U:%G' /var/log/xray/access.log 2>/dev/null || true)
+  echo "Xray access.log: ${logperms}"
+  owner=${logperms##* }
+  if [[ $owner == root:root ]]; then
+    echo "FAIL /var/log/xray/access.log is root-owned; Xray (nobody) cannot write it."
+    echo "     fix: sudo chown -R nobody:nogroup /var/log/xray && sudo systemctl restart xray"
+    fail=1
+  fi
+fi
+
+XRAY_CFG=/usr/local/etc/xray/config.json
+if [[ -f $XRAY_CFG ]]; then
+  perms=$(stat -c '%a %U:%G' "$XRAY_CFG" 2>/dev/null || stat -f '%OLp %Su:%Sg' "$XRAY_CFG")
+  echo "Xray config: ${XRAY_CFG} (${perms})"
+  mode=${perms%% *}
+  if [[ $mode != 644 && $mode != 664 && $mode != 755 ]]; then
+    echo "FAIL Xray config mode is ${mode}; the xray user (nobody) must be able to read it."
+    echo "     fix: chmod 644 ${XRAY_CFG} && systemctl restart xray"
+    fail=1
+  fi
+else
+  echo "FAIL missing ${XRAY_CFG}"
+  fail=1
+fi
+if [[ -x /usr/local/bin/xray && -f $XRAY_CFG ]]; then
+  echo "Xray config test (as nobody):"
+  if id nobody >/dev/null 2>&1 && command -v runuser >/dev/null 2>&1; then
+    if runuser -u nobody -- /usr/local/bin/xray run -test -c "$XRAY_CFG"; then
+      echo "OK   xray -test as nobody"
+    else
+      echo "FAIL xray -test as nobody (exit $?). This is why port 443 is down."
+      fail=1
+    fi
+  elif /usr/local/bin/xray run -test -c "$XRAY_CFG"; then
+    echo "OK   xray -test as root"
+  else
+    echo "FAIL xray -test failed"
+    fail=1
+  fi
+fi
+if ! systemctl is-active --quiet xray; then
+  echo "--- journalctl -u xray ---"
+  journalctl -u xray -n 25 --no-pager || true
+  echo "--------------------------"
+fi
+echo
+
 listening() {
-  local spec=$1
+  local port=$1
   if ! command -v ss >/dev/null 2>&1; then
-    echo "WARN ss not installed; skip port ${spec}"
+    echo "WARN ss not installed; skip port ${port}"
     return 0
   fi
-  if ss -lnt 2>/dev/null | awk '{print $4}' | grep -qE "$spec"; then
-    echo "OK   listening ${spec}"
+  # :443 must not match :8443 (plain grep 443 does).
+  if ss -lnt 2>/dev/null | awk '{print $4}' | grep -E ":${port}$" >/dev/null; then
+    echo "OK   listening :${port}"
   else
-    echo "FAIL not listening ${spec}"
+    echo "FAIL not listening :${port}"
     fail=1
   fi
 }
 
-listening ':80$'
-listening ':443$'
-listening ':8443$'
-listening ':8787$'
+listening 80
+listening 443
+listening 8443
+listening 8787
 echo
+if systemctl is-active --quiet xray && ! ss -lnt 2>/dev/null | awk '{print $4}' | grep -E ':443$' >/dev/null; then
+  echo "FAIL systemd says xray is active, but nothing is on :443. Dashboard will show Xray down."
+  journalctl -u xray -n 15 --no-pager || true
+  fail=1
+fi
 
 if curl -fsS -m 5 http://127.0.0.1/api/health >/dev/null; then
   echo "OK   http://127.0.0.1/api/health"
@@ -105,8 +159,9 @@ echo "  Cloudflare SSL/TLS: use Full (strict) only AFTER an Origin Certificate"
 echo "  or run: sudo bash /opt/tunnel-kit/scripts/issue-cert.sh"
 echo
 if [[ $fail -ne 0 ]]; then
-  echo "Doctor found problems. Fix the FAIL lines, then:"
-  echo "  sudo bash /opt/tunnel-kit/scripts/apply.sh"
+  echo "Doctor found problems. To bring Xray up on :443:"
+  echo "  sudo bash /opt/tunnel-kit/scripts/fix-xray-now.sh"
+  echo "then: sudo bash /opt/tunnel-kit/scripts/apply.sh"
   exit 1
 fi
 echo "Doctor: no local FAIL lines. If the public URL still fails, it is DNS or the CDN in front."
