@@ -91,24 +91,30 @@ fi
 echo
 
 listening() {
-  local spec=$1
+  local port=$1
   if ! command -v ss >/dev/null 2>&1; then
-    echo "WARN ss not installed; skip port ${spec}"
+    echo "WARN ss not installed; skip port ${port}"
     return 0
   fi
-  if ss -lnt 2>/dev/null | awk '{print $4}' | grep -qE "$spec"; then
-    echo "OK   listening ${spec}"
+  # :443 must not match :8443 (plain grep 443 does).
+  if ss -lnt 2>/dev/null | awk '{print $4}' | grep -E ":${port}$" >/dev/null; then
+    echo "OK   listening :${port}"
   else
-    echo "FAIL not listening ${spec}"
+    echo "FAIL not listening :${port}"
     fail=1
   fi
 }
 
-listening ':80$'
-listening ':443$'
-listening ':8443$'
-listening ':8787$'
+listening 80
+listening 443
+listening 8443
+listening 8787
 echo
+if systemctl is-active --quiet xray && ! ss -lnt 2>/dev/null | awk '{print $4}' | grep -E ':443$' >/dev/null; then
+  echo "FAIL systemd says xray is active, but nothing is on :443. Dashboard will show Xray down."
+  journalctl -u xray -n 15 --no-pager || true
+  fail=1
+fi
 
 if curl -fsS -m 5 http://127.0.0.1/api/health >/dev/null; then
   echo "OK   http://127.0.0.1/api/health"

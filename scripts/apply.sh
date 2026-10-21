@@ -39,15 +39,25 @@ if [[ -x /usr/local/bin/xray ]]; then
 fi
 
 systemctl restart caddy xray tunnel-kit-api
-sleep 0.4
+sleep 1
 systemctl --no-pager --full status caddy xray tunnel-kit-api | sed -n '1,28p'
 
-if ! systemctl is-active --quiet xray; then
+listening_port() {
+  # Match :443 but not :8443.
+  ss -lnt 2>/dev/null | awk '{print $4}' | grep -E ":${1}$" >/dev/null
+}
+
+if ! systemctl is-active --quiet xray || ! listening_port 443; then
   echo
-  echo "Xray failed to start. Last logs:"
+  echo "Xray is not serving port 443 (systemd active=$(systemctl is-active xray || true))."
+  echo "ss listeners:"
+  ss -lnt 2>/dev/null | awk 'NR==1 || $4 ~ /:(80|443|8443|8787)$/' || true
+  echo
+  echo "Last logs:"
   journalctl -u xray -n 40 --no-pager || true
   echo
   echo "Config perms: $(ls -l "$XRAY_CFG" 2>/dev/null || echo missing)"
+  echo "Log dir: $(ls -la /var/log/xray 2>/dev/null || echo missing)"
   exit 1
 fi
-echo "Applied."
+echo "Applied. Xray is listening on 443."

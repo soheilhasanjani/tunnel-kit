@@ -86,6 +86,24 @@ That gives you:
 - `vpn.example.com` — dashboard + the proxied XHTTP profile
 - `direct.example.com` — Reality (straight to the VPS)
 
+### ArvanCloud (ابر آروان)
+
+This is the usual setup in Iran. Two A records, both to the VPS IP (`64.227.29.143` in the example):
+
+| Record | Cloud icon | Why |
+| --- | --- | --- |
+| `vpn` → `vpn.akbarbegins.ir` | **ON** (active cloud) | Dashboard + proxied XHTTP. Visitors hit ArvanCloud, not the raw IP. |
+| `direct` → `direct.akbarbegins.ir` | **OFF** | Reality. Must skip the CDN or Reality breaks. |
+
+The raw IP (`http://64.227.29.143/`) opening the dashboard is expected: that hits Caddy on **port 80**. The domain `vpn.…` goes through ArvanCloud, which by default talks to origin **port 443**. If Xray is down, 443 is closed, so **the domain fails and the IP still works**.
+
+In ArvanCloud → **CDN** → your domain:
+
+1. **HTTPS for visitors** — enable it and issue Arvan’s free edge certificate so `https://vpn.akbarbegins.ir` has a valid public cert. That cert is on ArvanCloud, not on the VPS.
+2. **Origin protocol / اتصال به سرور اصلی** for the `vpn` record — set to **HTTP** until Xray is listening on 443 and you have a real origin certificate. Then ArvanCloud fetches `http://VPS:80` (the dashboard).
+3. Do **not** set origin to HTTPS while Xray is down, or while the VPS cert is self-signed. That is why `vpn.akbarbegins.ir` does not load.
+4. After Xray is `active` **and** `ss` shows `0.0.0.0:443` (not `8443`), you may switch origin to HTTPS and install an origin cert (`scripts/issue-cert.sh`).
+
 ### Cloudflare (still supported)
 
 In Cloudflare → **DNS**, add two A records to the VPS IP:
@@ -215,7 +233,7 @@ Mux / multiplexing: leave **off**.
 
 The usual causes:
 
-1. **Xray is not running** (doctor shows `FAIL service xray` and `not listening :443`). Xray runs as `nobody`. Exit **23** is usually:
+1. **Xray is not running** (dashboard shows Xray **down**, `ss` has no `0.0.0.0:443`). `grep 443` also matches Caddy’s **8443** — that is not Xray. Xray runs as `nobody`. Exit **23** is usually:
    - `config.json` mode `600` (cannot read), or
    - `/var/log/xray/access.log` owned by **root** (cannot write). `chown` on the directory does not change that file. `scripts/apply.sh` now `chown -R` the log dir and sends Xray logs to the systemd journal instead.
 2. You opened `https://…` before installing an origin certificate (browser or Cloudflare Error 526).
